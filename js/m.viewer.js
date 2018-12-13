@@ -99,14 +99,17 @@ jQuery(document).ready(function() {
     // Sets up rend3d
     initRenderer();
     model.meshes.forEach(function (mesh) {
-      addMesh(mesh);
+      ren3d.add(mesh.xtkObject);
+      mesh.getLandmarks().forEach(function(landmark) {
+        ren3d.add(landmark.xtkObject);
+      });
     });
 
     if(initial_mesh_list)
       need2Show=true;
 
     // load the landmarks
-    preloadLandmarks(model.landmarks);
+    //preloadLandmarks(model.landmarks);
 
     show_caption=false;
 
@@ -962,91 +965,6 @@ function safeEncodeURI(uri) {
   return uri;
 }
 
-// create mesh object 
-//    add to the local mesh list
-//    add to 3D renderer
-//    add to ui's meshlist 
-// t needs to have color, label, 
-// meshs[0] is the X.mesh object, meshs[1] is the json 
-function addMesh(t) { // color, url, caption
-
-// continue only if the mesh is new
-  var _mesh = new X.mesh();
-  var _idx=meshs.length;
-//
-  var _color= t['color'];
-  if(_color == undefined) {
-    _color=getDefaultColor(_idx);
-    t['color']=_color;
-  }
-  _mesh.color = _color;
-//
-  var _url=t['url'];
-  if(_url == undefined) {
-    throw new Error("mesh must have an url!");
-  }
-  if(typeof _url == "object") { // this is a local file
-    if( _url instanceof File) {
-      _mesh.file = _url.name;
-      readLocal2Mesh(_mesh,_url);
-      // reset _url
-      _url=_url.name;
-      t['url']=_url;
-      } else {
-        throw new Error("local mesh must be a File object type!");
-    }
-    } else {
-      _mesh.file = safeEncodeURI(_url);
-  }
-//
-  var _label = getLabel(t);
-  var _href = getHref(t);
-//
-  var _caption = t['caption'];
-  if(_caption == undefined) {
-    _caption = { 'description':_label,'link':_href };
-    t['caption']=_caption;
-  }
-  _mesh.caption=_caption;
-//
-  var _opacity=t['opacity'];
-  if(_opacity == undefined) {
-    _opacity=1;
-    t['opacity']=_opacity;
-  }
-  _mesh.opacity = _opacity;
-//
-  var _id=t['id']; 
-  if(_id == undefined) {
-   // reuse label
-     _id=_label;
-     t['id']=_id;
-  }
-  _mesh.id= _id;
-//
-
-// if the label already exists, then alter the name
-// still allow it in order for user to test 'alignment'
-  var tmp=lookupMeshByID(_id);
-  if(tmp) {
-    var r=randomString(4);
-    _id=_id+"_"+r;
-    _label=_label+" "+r;
-    t['id']=_id;
-    t['label']=_label;
-  }
-
-  var loadingDiv = document.getElementById('loading');
-  loadingDiv.style.display ='';
-  ren3d.add(_mesh);
-
-// meshs[0] is the _mesh, meshs[1] is the original object
-  var _cnt=meshs.push([_mesh,t]);
-  var _name=_id.toString();
- 
-  addMeshListEntry(_label,_name,_idx,_color,_opacity,_href);
-}
-
 // adding volume after initial rendering
 function loadVol() {
   var _v=vol_load();
@@ -1072,44 +990,6 @@ function lookupMeshByID(id) {
   return null;
 }
 
-function addLandmark(p) {
-  // Enable the landmarks button
-  if (document.getElementById('landmarkbtn').style.display == 'none')
-    document.getElementById('landmarkbtn').style.display = '';
-
-  var _g=p['group'].toLowerCase();
-  var _mesh=lookupMeshByID(_g);
-  if( _mesh == null ) {
-    window.console.log("BAD BAD.. can not find mesh for "+_g);
-    return;
-  }
-  // Another routine relies on groupids not containing spaces, which will cause the
-  // model not to load. Skipping offending landmarks enables some usage of the model
-  if(_g.indexOf(' ') >= 0) {
-    window.console.error("Landmark 'Group' field may not contain spaces: '"+_g+"'");
-    return;
-  }
-
-  var _c=p['color'];
-  var _r=p['radius'];
-  var _loc=p['point'];
-  var _vis=p['visible'];
-  var _label = getLabel(p)
-
-  var _s=addSphere(_loc, _c, _r, _vis, _label);
-
-  
-  landmarks.push([_s, p]);
-  if( landmarklist[_g] == null ) {
-    landmarklist[_g]=[];
-    landmarklist[_g].push(_s);
-    } else {
-      landmarklist[_g].push(_s);
-  }
-
-  var _href=getHref(p);
-  addLandmarkListEntry(_g,landmarklist[_g].length,_mesh.color,_label,_href);
-}
 
 function autoLandmark(){
 // bring in the random points
@@ -1151,22 +1031,6 @@ function addSphereByIdx(mesh, pt, color, visible, radius) {
   var _m='pt '+String(pt)+' out of '+mesh.points.count;
   var caption= { "type":"POINT","data": _m };
   return addSphere(_l, color, radius, visible, caption);
-}
-
-var newSphere;
-function addSphere(loc, color, radius, visible,caption) {
-  // deep copy the caption..
-  var _cap = JSON.stringify(caption);
-  var _caption=JSON.parse(_cap);
-  newSphere = new X.sphere();
-  newSphere.center = loc;
-  _caption['data']=caption['description']+'<br>x: '+String(loc[0])+'<br>y: '+String(loc[1])+'<br>z: '+String(loc[2]);
-  newSphere.color = color;
-  newSphere.radius = radius; 
-  newSphere.visible=visible;
-  newSphere.caption = JSON.stringify(_caption);
-  ren3d.add(newSphere);
-  return newSphere;
 }
 
 function hlite(mesh) {

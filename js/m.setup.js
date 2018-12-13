@@ -220,47 +220,28 @@ function setupModel(model) {
 }
 
 function setupMeshes(meshes) {
-  var formattedMeshes = []
+  meshObjects = []
   meshes.forEach(function (mesh) {
-    var formattedMesh = {
-      'id': mesh.RID,
-      'link': mesh.link || {'url': null, 'label': null},
-      'label': mesh.anatomy,
-      'description': mesh.description,
-      'url': development_hostname + mesh.url,
-      'opacity': mesh.opacity,
-      'color': parseColor(mesh.color_r, mesh.color_b, mesh.color_g)
-    }
-    formattedMeshes.push(formattedMesh);
+    var color = parseColor(mesh.color_r, mesh.color_b, mesh.color_g)
+    var url = development_hostname + mesh.url;
+    var link = mesh.link || {'url': null, 'label': null}
+    meshObjects.push(new Mesh(mesh.RID, url, mesh.description, color,
+                              mesh.opacity, link, mesh.anatomy))
   });
-  return formattedMeshes;
+  return meshObjects;
 }
 
 function setupLandmarks(landmarks) {
-  var formattedLandmarks = []
+  var landmarkObjects = []
   landmarks.forEach(function (landmark) {
-    var formattedLandmark = {
-      'id': landmark.RID,
-      'group': landmark.mesh,
-      'description': landmark.description,
-      'point': [landmark.point_x, landmark.point_y, landmark.point_z],
-      'color': parseColor(landmark.color_r, landmark.color_b, landmark.color_g),
-      'label': landmark.label || '',
-      'link': landmark.link || {'url': null, 'label': null},
-      'radius': landmark.radius || 0.1,
-    }
-    formattedLandmarks.push(formattedLandmark);
+    var color = parseColor(landmark.color_r, landmark.color_b, landmark.color_g);
+    var location = [landmark.point_x, landmark.point_y, landmark.point_z];
+    var link = {'url': null, 'label': null};
+    var radius = landmark.radius || 0.1
+    landmarkObjects.push(new Landmark(landmark.RID, landmark.mesh, location, landmark.description,
+                                      color, link, radius));
   });
-  if (formattedLandmarks.length > 0) {
-    // Global variable that determines whether landmarks should show up in mesh list
-    // Currently in m.viewer.js, meshes and landmarks have a bit of a circular dependency
-    // on one another when both are collected, and currently require meshes to be constructed
-    // first and landmarks second, with 'hasLandmarks' existing so that meshes know landmarks
-    // do exist before they're ready. m.viewer.js will need to be refactored before 'hasLandmarks'
-    // can be removed.
-    hasLandmarks = true;
-  }
-  return formattedLandmarks;
+  return landmarkObjects;
 }
 
 function postSetup(model) {
@@ -269,13 +250,21 @@ function postSetup(model) {
     'meshes': model['meshes_url'],
     'landmarks': model['landmarks_url'],
   }
-  if (model.anatomy_url_fragment) {
-    function setURL(meshOrLandmark) {
-      meshOrLandmark.link.url = model.anatomy_url_fragment + meshOrLandmark.id;
-    }
-    formattedModel.meshes.forEach(setURL);
-    formattedModel.landmarks.forEach(setURL);
-  }
+  formattedModel.landmarks.forEach(function(landmark) {
+    formattedModel.meshes.forEach(function (mesh) {
+      if (landmark.mesh == mesh.id) {
+        mesh.addLandmark(landmark);
+      }
+    });
+  });
+// #FIXME -- FIX URLS BEFORE MERGING
+//  if (model.anatomy_url_fragment) {
+//    function setURL(meshOrLandmark) {
+//      meshOrLandmark.link.url = model.anatomy_url_fragment + meshOrLandmark.id;
+//    }
+//    formattedModel.meshes.forEach(setURL);
+//    formattedModel.landmarks.forEach(setURL);
+//  }
   return formattedModel;
 }
 
